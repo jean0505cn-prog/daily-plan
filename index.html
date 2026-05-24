@@ -3,6 +3,12 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#3f5b6b">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="一日计划">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
 <title>我的一日计划</title>
 <style>
   :root{
@@ -103,6 +109,22 @@
   .save-state{font-size:12px;color:var(--hint);}
   .save-state.dirty{color:var(--danger);}
   .save-state.saved{color:var(--accent);}
+  .sync-wrap{
+    display:flex;align-items:center;gap:8px;flex-wrap:wrap;
+  }
+  .sync-state{font-size:12px;color:var(--hint);}
+  .sync-state.ok{color:var(--accent);}
+  .sync-state.warn{color:#9a6b1f;}
+  .sync-state.error{color:var(--danger);}
+  .sync-auth{display:flex;align-items:center;gap:6px;min-height:28px;}
+  .sync-auth:empty{display:none;}
+  .btn-sync{
+    background:#fff;color:var(--ink-soft);border:1px solid var(--line);
+    border-radius:7px;padding:6px 10px;font-size:12px;
+    font-family:inherit;cursor:pointer;
+  }
+  .btn-sync:hover{background:#f3f3f0;}
+  .btn-sync[hidden]{display:none;}
   .btn{
     font-family:inherit;font-size:13px;cursor:pointer;
     border-radius:7px;padding:7px 14px;font-weight:500;
@@ -246,6 +268,8 @@
     }
     .main-inner{padding:24px 16px 70px;}
     .section{padding:20px 16px 6px;}
+    .toolbar{align-items:flex-start;}
+    .sync-wrap{width:100%;justify-content:flex-start;}
   }
 
   /* ---------- print ---------- */
@@ -286,7 +310,15 @@
           <input type="date" id="planDate">
         </div>
         <div class="spacer"></div>
-        <span class="save-state" id="saveState"></span>
+        <div class="sync-wrap">
+          <span class="save-state" id="saveState"></span>
+          <span class="sync-state" id="syncState"></span>
+          <button class="btn-sync" id="btnSyncCloud" type="button" hidden>同步本机记录</button>
+          <div class="sync-auth">
+            <div id="apple-sign-in-button"></div>
+            <div id="apple-sign-out-button"></div>
+          </div>
+        </div>
         <button class="btn btn-ghost" id="btnPrint">打印</button>
         <button class="btn btn-danger" id="btnDelete" style="display:none">删除</button>
       </div>
@@ -401,6 +433,8 @@
   </div>
 </div>
 
+<script src="https://cdn.apple-cloudkit.com/ck/2/cloudkit.js"></script>
+<script src="cloudkit-config.js"></script>
 <script>
 (function(){
   "use strict";
@@ -408,12 +442,15 @@
   /* ============ 常量 ============ */
   var STORE_KEY = "myDailyPlans_v1";
   var DRAFT_KEY = "myDailyPlanDraft_v1";
+  var CLOUD_MIGRATION_KEY = "myDailyPlanCloudMigrated_v1";
 
   /* ============ DOM ============ */
   var $ = function(id){return document.getElementById(id);};
   var histList   = $("histList");
   var planDate   = $("planDate");
   var saveState  = $("saveState");
+  var syncState  = $("syncState");
+  var btnSyncCloud = $("btnSyncCloud");
   var thingsList = $("thingsList");
   var goalsList  = $("goalsList");
   var actionsList= $("actionsList");
@@ -424,6 +461,15 @@
   var plans = [];          // 全部历史
   var currentId = null;    // 当前正在编辑的记录 id（null = 新建未保存）
   var dirty = false;       // 是否有未保存的改动
+  var cloud = {
+    configured:false,
+    ready:false,
+    signedIn:false,
+    syncing:false,
+    container:null,
+    database:null,
+    recordType:"DailyPlan"
+  };
 
   /* ============ 存取 ============ */
   function loadPlans(){
@@ -440,6 +486,17 @@
   }
   function clearDraft(){
     try{ localStorage.removeItem(DRAFT_KEY); }catch(e){}
+  }
+
+  function localPlanFromData(id,data,createdAt,updatedAt){
+    data=data||{};
+    return {
+      id:id||uid(),
+      date:data.date||todayStr(),
+      data:data,
+      createdAt:createdAt||Date.now(),
+      updatedAt:updatedAt||Date.now()
+    };
   }
 
   /* ============ 工具 ============ */
@@ -470,6 +527,14 @@
     dirty=false;
     saveState.textContent="✓ 已保存";
     saveState.className="save-state saved";
+  }
+  function setSyncState(text,kind){
+    syncState.textContent=text||"";
+    syncState.className="sync-state"+(kind?" "+kind:"");
+  }
+  function updateCloudControls(){
+    if(!btnSyncCloud) return;
+    btnSyncCloud.hidden=!(cloud.configured&&cloud.signedIn);
   }
 
   /* ============ 重复项模板 ============ */
@@ -651,6 +716,245 @@
     }
   }
 
+  /* ============ iCloud / CloudKit 同步 ============ */
+  function cloudConfig(){
+    return window.DAILY_PLAN_CLOUDKIT_CONFIG || {};
+  }
+  function hasCloudConfig(cfg){
+    return !!(cfg && cfg.containerIdentifier && cfg.apiToken &&
+      cfg.containerIdentifier.indexOf("YOUR_")!==0 &&
+      cfg.apiToken.indexOf("YOUR_")!==0);
+  }
+  function recordNameForDate(date){
+    return "daily-plan-"+String(date||todayStr()).replace(/[^A-Za-z0-9_-]/g,"-");
+  }
+  function planToRecord(plan,existingRecord){
+    var record={
+      recordName:recordNameForDate(plan.date),
+      recordType:cloud.recordType,
+      fields:{
+        date:{value:plan.date},
+        payload:{value:JSON.stringify(plan.data)},
+        updatedAt:{value:plan.updatedAt||Date.now()}
+      }
+    };
+    if(existingRecord && existingRecord.recordChangeTag){
+      record.recordChangeTag=existingRecord.recordChangeTag;
+    }
+    return record;
+  }
+  function recordToPlan(record){
+    var fields=record.fields||{};
+    var data={};
+    try{ data=JSON.parse(fields.payload&&fields.payload.value||"{}"); }
+    catch(e){ data={}; }
+    var date=(fields.date&&fields.date.value)||data.date||todayStr();
+    data.date=date;
+    return {
+      id:record.recordName||recordNameForDate(date),
+      date:date,
+      data:data,
+      createdAt:record.created&&record.created.timestamp||Date.now(),
+      updatedAt:(fields.updatedAt&&Number(fields.updatedAt.value))||
+        (record.modified&&record.modified.timestamp)||Date.now()
+    };
+  }
+  function findPlanByDate(date){
+    for(var i=0;i<plans.length;i++){
+      if(plans[i].date===date) return plans[i];
+    }
+    return null;
+  }
+  function mergePlans(incoming){
+    var changed=false;
+    for(var i=0;i<incoming.length;i++){
+      var cloudPlan=incoming[i];
+      var local=findPlanByDate(cloudPlan.date);
+      if(!local){
+        plans.push(cloudPlan);
+        changed=true;
+      }else if((cloudPlan.updatedAt||0)>(local.updatedAt||0)){
+        local.id=local.id||cloudPlan.id;
+        local.date=cloudPlan.date;
+        local.data=cloudPlan.data;
+        local.updatedAt=cloudPlan.updatedAt;
+        changed=true;
+      }
+    }
+    if(changed){
+      persist();
+      renderHistory();
+      if(currentId){
+        for(var j=0;j<plans.length;j++){
+          if(plans[j].id===currentId){ renderForm(plans[j].data); break; }
+        }
+      }
+    }
+    return changed;
+  }
+  function ensureCloudReady(){
+    if(!cloud.configured) return Promise.reject(new Error("CloudKit 尚未配置。"));
+    if(!cloud.signedIn) return Promise.reject(new Error("请先登录 iCloud。"));
+    return Promise.resolve();
+  }
+  function fetchCloudRecord(date){
+    return cloud.database.fetchRecords(recordNameForDate(date)).then(function(response){
+      if(response.hasErrors){
+        var err=response.errors&&response.errors[0];
+        if(err && (err.serverErrorCode==="NOT_FOUND" || err.code==="NOT_FOUND")) return null;
+        return null;
+      }
+      return response.records&&response.records[0]||null;
+    }).catch(function(){ return null; });
+  }
+  function savePlanToCloud(plan){
+    return ensureCloudReady().then(function(){
+      return fetchCloudRecord(plan.date);
+    }).then(function(existing){
+      return cloud.database.saveRecords(planToRecord(plan,existing));
+    }).then(function(response){
+      if(response.hasErrors) throw response.errors[0];
+      return response.records&&response.records[0];
+    });
+  }
+  function fetchAllCloudPlans(){
+    return ensureCloudReady().then(function(){
+      var query={
+        recordType:cloud.recordType,
+        filterBy:[{
+          fieldName:"date",
+          comparator:"NOT_EQUALS",
+          fieldValue:{value:"__never__"}
+        }]
+      };
+      return cloud.database.performQuery(query,{resultsLimit:100});
+    }).then(function(response){
+      if(response.hasErrors) throw response.errors[0];
+      return (response.records||[]).map(recordToPlan);
+    });
+  }
+  function syncCurrentPlanToCloud(){
+    if(!cloud.configured){
+      setSyncState("iCloud 未配置","warn");
+      return;
+    }
+    if(!cloud.signedIn){
+      setSyncState("未登录 iCloud","warn");
+      return;
+    }
+    var plan=null;
+    for(var i=0;i<plans.length;i++){
+      if(plans[i].id===currentId){ plan=plans[i]; break; }
+    }
+    if(!plan) return;
+    cloud.syncing=true;
+    setSyncState("正在同步…","");
+    savePlanToCloud(plan).then(function(){
+      setSyncState("iCloud 已同步","ok");
+    }).catch(function(err){
+      console.warn("CloudKit sync failed",err);
+      setSyncState("同步失败，已保存在本机","error");
+    }).then(function(){
+      cloud.syncing=false;
+    });
+  }
+  function syncLocalPlansToCloud(){
+    return ensureCloudReady().then(function(){
+      setSyncState("正在同步本机记录…","");
+      var chain=Promise.resolve();
+      for(var i=0;i<plans.length;i++){
+        (function(plan){
+          chain=chain.then(function(){ return savePlanToCloud(plan); });
+        })(plans[i]);
+      }
+      return chain;
+    }).then(function(){
+      try{ localStorage.setItem(CLOUD_MIGRATION_KEY,"1"); }catch(e){}
+      return fetchAllCloudPlans();
+    }).then(function(cloudPlans){
+      mergePlans(cloudPlans);
+      setSyncState("iCloud 已同步","ok");
+    }).catch(function(err){
+      console.warn("CloudKit migration failed",err);
+      setSyncState("同步失败，已保存在本机","error");
+    });
+  }
+  function maybeOfferCloudMigration(){
+    if(!plans.length) return;
+    try{
+      if(localStorage.getItem(CLOUD_MIGRATION_KEY)==="1") return;
+    }catch(e){}
+    if(confirm("检测到本机已有一日计划记录。是否同步到 iCloud，方便在 iPhone 和 Mac 之间使用？")){
+      syncLocalPlansToCloud();
+    }
+  }
+  function loadCloudPlans(){
+    if(!cloud.signedIn) return;
+    setSyncState("正在读取 iCloud…","");
+    fetchAllCloudPlans().then(function(cloudPlans){
+      mergePlans(cloudPlans);
+      setSyncState("iCloud 已同步","ok");
+      maybeOfferCloudMigration();
+    }).catch(function(err){
+      console.warn("CloudKit fetch failed",err);
+      setSyncState("无法读取 iCloud，使用本机记录","error");
+    });
+  }
+  function setupCloudKit(){
+    var cfg=cloudConfig();
+    cloud.configured=hasCloudConfig(cfg);
+    cloud.recordType=cfg.recordType||"DailyPlan";
+    if(!cloud.configured){
+      setSyncState("iCloud 未配置","warn");
+      updateCloudControls();
+      return;
+    }
+    if(!window.CloudKit){
+      setSyncState("CloudKit 加载中…","");
+      return;
+    }
+    try{
+      window.CloudKit.configure({
+        containers:[{
+          containerIdentifier:cfg.containerIdentifier,
+          environment:cfg.environment||"development",
+          apiTokenAuth:{
+            apiToken:cfg.apiToken,
+            persist:true,
+            signInButton:{id:"apple-sign-in-button",theme:"black"},
+            signOutButton:{id:"apple-sign-out-button",theme:"black"}
+          }
+        }]
+      });
+      cloud.container=window.CloudKit.getDefaultContainer();
+      cloud.database=cloud.container.privateCloudDatabase;
+      cloud.ready=true;
+      cloud.container.whenUserSignsIn().then(function(userIdentity){
+        cloud.signedIn=!!userIdentity;
+        setSyncState("已登录 iCloud","ok");
+        updateCloudControls();
+        loadCloudPlans();
+      });
+      cloud.container.whenUserSignsOut().then(function(){
+        cloud.signedIn=false;
+        setSyncState("未登录 iCloud","warn");
+        updateCloudControls();
+      });
+      cloud.container.setUpAuth().then(function(userIdentity){
+        cloud.signedIn=!!userIdentity;
+        setSyncState(cloud.signedIn?"已登录 iCloud":"未登录 iCloud",cloud.signedIn?"ok":"warn");
+        updateCloudControls();
+        if(cloud.signedIn) loadCloudPlans();
+      }).catch(function(err){
+        console.warn("CloudKit auth setup failed",err);
+        setSyncState("iCloud 登录不可用","error");
+      });
+    }catch(e){
+      console.warn("CloudKit configure failed",e);
+      setSyncState("iCloud 配置错误","error");
+    }
+  }
+
   /* ============ 新建 / 保存 / 删除 ============ */
   function newPlan(){
     if(dirty && !confirm("当前有未保存的改动，确定新建吗？")) return;
@@ -666,25 +970,27 @@
   function savePlan(){
     var data=readForm();
     if(!data.date){ alert("请先选择计划日期。"); return; }
+    var now=Date.now();
     if(currentId){
       for(var i=0;i<plans.length;i++){
         if(plans[i].id===currentId){
           plans[i].date=data.date;
           plans[i].data=data;
-          plans[i].updatedAt=Date.now();
+          plans[i].updatedAt=now;
           break;
         }
       }
     }else{
       currentId=uid();
       plans.push({id:currentId,date:data.date,data:data,
-                  createdAt:Date.now(),updatedAt:Date.now()});
+                  createdAt:now,updatedAt:now});
     }
     persist();
     clearDraft();
     markSaved();
     $("btnDelete").style.display="";
     renderHistory();
+    syncCurrentPlanToCloud();
   }
 
   function deletePlan(){
@@ -802,7 +1108,7 @@
       var el=document.createElement("div");
       el.className="hist-item"+(p.id===currentId?" active":"");
       el.setAttribute("data-id",p.id);
-      el.innerHTML='<div class="hist-date">'+fmtDate(p.date)+'</div>'+
+      el.innerHTML='<div class="hist-date">'+fmtDate(p.date)+'</div>'+ 
                    '<div class="hist-preview">'+escapeHtml(planPreview(p))+'</div>';
       histList.appendChild(el);
     }
@@ -840,6 +1146,7 @@
   $("btnNew").addEventListener("click",newPlan);
   $("btnDelete").addEventListener("click",deletePlan);
   $("btnPrint").addEventListener("click",function(){window.print();});
+  btnSyncCloud.addEventListener("click",syncLocalPlansToCloud);
   $("btnExport").addEventListener("click",exportBackup);
   $("btnImport").addEventListener("click",function(){ $("importFile").click(); });
   $("importFile").addEventListener("change",function(e){
@@ -866,6 +1173,11 @@
   /* ============ 初始化 ============ */
   function init(){
     loadPlans();
+    if("serviceWorker" in navigator){
+      navigator.serviceWorker.register("sw.js").catch(function(){});
+    }
+    setupCloudKit();
+    if(!window.CloudKit) window.addEventListener("cloudkitloaded",setupCloudKit);
     if(window.innerWidth<=780) $("sidebar").classList.add("collapsed");
 
     var draft=null;
