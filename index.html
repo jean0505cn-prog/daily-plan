@@ -136,6 +136,11 @@
     letter-spacing:1.5px;
   }
   .section-title{font-size:18px;font-weight:700;margin-bottom:20px;}
+  .section-actions{
+    display:flex;justify-content:flex-end;
+    border-top:1px solid var(--line-soft);
+    padding-top:16px;margin:4px 0 14px;
+  }
 
   /* ---------- question block ---------- */
   .q{margin-bottom:24px;}
@@ -245,7 +250,7 @@
 
   /* ---------- print ---------- */
   @media print{
-    .sidebar,.toolbar,.btn-add,.btn-remove,.menu-toggle{display:none!important;}
+    .sidebar,.toolbar,.btn-add,.btn-remove,.menu-toggle,.section-actions{display:none!important;}
     body{background:#fff;}
     .section{box-shadow:none;border-color:#ddd;page-break-inside:avoid;}
     .main-inner{max-width:100%;padding:0;}
@@ -284,16 +289,58 @@
         <span class="save-state" id="saveState"></span>
         <button class="btn btn-ghost" id="btnPrint">打印</button>
         <button class="btn btn-danger" id="btnDelete" style="display:none">删除</button>
-        <button class="btn btn-primary" id="btnSave">保存</button>
       </div>
 
       <div class="page-title">我的一日目标与计划</div>
       <div class="page-quote">明确的目标计划，会让期待的事情，更容易发生。</div>
 
-      <!-- ============ Section A：目标与计划 ============ -->
+      <!-- ============ Section A：成就复盘 ============ -->
       <div class="section">
         <div class="section-head">
           <span class="section-tag">PART 1</span>
+        </div>
+        <div class="section-title">上一日成就复盘</div>
+
+        <!-- R1 -->
+        <div class="q">
+          <div><span class="q-num">1</span><span class="q-text">过去一天，我的哪些重要事项取得了新进展？我是如何成功做到的？</span></div>
+          <div class="q-hint">在你正在努力的事情上，设置目标进度条：0 是起点，100% 是终点，记录一天行动带来的进度变化。</div>
+          <div class="q-body">
+            <div id="progressList"></div>
+            <button class="btn-add" data-add="progress">＋ 添加一项进展</button>
+          </div>
+        </div>
+
+        <!-- R2 -->
+        <div class="q">
+          <div><span class="q-num">2</span><span class="q-text">推进过程中，我获得了哪些积极信号，意味着进展发生了？</span></div>
+          <div class="q-hint">例如：积极反馈、经验增长，或者生活发生了新变化。初期这些信号可能不明显，未来你可以持续观察这些变化。</div>
+          <div class="q-body">
+            <div id="signalsList"></div>
+            <button class="btn-add" data-add="signal">＋ 添加一个积极信号</button>
+          </div>
+        </div>
+
+        <!-- R3 -->
+        <div class="q" style="margin-bottom:14px;">
+          <div><span class="q-num">3</span><span class="q-text">此刻，给正在使用「成就视角」记录生活的自己，一点庆祝吧！</span></div>
+          <div class="q-hint">说一点鼓励的话，或者做一个庆祝动作！</div>
+          <div class="q-body">
+            <div class="celebrate">
+              <textarea id="celebration" placeholder="对自己说点什么吧……"></textarea>
+            </div>
+          </div>
+        </div>
+
+        <div class="section-actions">
+          <button class="btn btn-primary btn-save" type="button">保存复盘</button>
+        </div>
+      </div>
+
+      <!-- ============ Section B：目标与计划 ============ -->
+      <div class="section">
+        <div class="section-head">
+          <span class="section-tag">PART 2</span>
         </div>
         <div class="section-title">我的一日目标与计划</div>
 
@@ -344,44 +391,9 @@
             <input type="text" id="attitude" placeholder="例如：践行、挑战、从容、温柔……">
           </div>
         </div>
-      </div>
 
-      <!-- ============ Section B：成就复盘 ============ -->
-      <div class="section">
-        <div class="section-head">
-          <span class="section-tag">PART 2</span>
-        </div>
-        <div class="section-title">上一日成就复盘</div>
-
-        <!-- R1 -->
-        <div class="q">
-          <div><span class="q-num">1</span><span class="q-text">过去一天，我的哪些重要事项取得了新进展？我是如何成功做到的？</span></div>
-          <div class="q-hint">在你正在努力的事情上，设置目标进度条：0 是起点，100% 是终点，记录一天行动带来的进度变化。</div>
-          <div class="q-body">
-            <div id="progressList"></div>
-            <button class="btn-add" data-add="progress">＋ 添加一项进展</button>
-          </div>
-        </div>
-
-        <!-- R2 -->
-        <div class="q">
-          <div><span class="q-num">2</span><span class="q-text">推进过程中，我获得了哪些积极信号，意味着进展发生了？</span></div>
-          <div class="q-hint">例如：积极反馈、经验增长，或者生活发生了新变化。初期这些信号可能不明显，未来你可以持续观察这些变化。</div>
-          <div class="q-body">
-            <div id="signalsList"></div>
-            <button class="btn-add" data-add="signal">＋ 添加一个积极信号</button>
-          </div>
-        </div>
-
-        <!-- R3 -->
-        <div class="q" style="margin-bottom:14px;">
-          <div><span class="q-num">3</span><span class="q-text">此刻，给正在使用「成就视角」记录生活的自己，一点庆祝吧！</span></div>
-          <div class="q-hint">说一点鼓励的话，或者做一个庆祝动作！</div>
-          <div class="q-body">
-            <div class="celebrate">
-              <textarea id="celebration" placeholder="对自己说点什么吧……"></textarea>
-            </div>
-          </div>
+        <div class="section-actions">
+          <button class="btn btn-primary btn-save" type="button">保存计划</button>
         </div>
       </div>
 
@@ -813,6 +825,9 @@
       return;
     }
 
+    var save=e.target.closest&&e.target.closest(".btn-save");
+    if(save){ savePlan(); return; }
+
     var hist=e.target.closest&&e.target.closest(".hist-item");
     if(hist){ openPlan(hist.getAttribute("data-id")); return; }
   });
@@ -823,7 +838,6 @@
   });
 
   $("btnNew").addEventListener("click",newPlan);
-  $("btnSave").addEventListener("click",savePlan);
   $("btnDelete").addEventListener("click",deletePlan);
   $("btnPrint").addEventListener("click",function(){window.print();});
   $("btnExport").addEventListener("click",exportBackup);
