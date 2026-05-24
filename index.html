@@ -1,0 +1,877 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>我的一日计划</title>
+<style>
+  :root{
+    --bg:#f5f5f3;
+    --card:#ffffff;
+    --ink:#2a2a2a;
+    --ink-soft:#5f5f5d;
+    --hint:#9b9b97;
+    --line:#e9e9e6;
+    --line-soft:#f0f0ed;
+    --accent:#3f5b6b;
+    --accent-soft:#eef2f4;
+    --accent-line:#cdd9df;
+    --danger:#b4544a;
+    --radius:12px;
+    --shadow:0 1px 3px rgba(0,0,0,.04), 0 8px 24px rgba(0,0,0,.04);
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  html,body{height:100%;}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+    background:var(--bg);
+    color:var(--ink);
+    font-size:15px;
+    line-height:1.7;
+    -webkit-font-smoothing:antialiased;
+  }
+  a{color:inherit;}
+
+  /* ---------- layout ---------- */
+  .app{display:flex;min-height:100vh;}
+  .sidebar{
+    width:248px;flex-shrink:0;
+    background:#fbfbfa;
+    border-right:1px solid var(--line);
+    display:flex;flex-direction:column;
+    position:sticky;top:0;height:100vh;
+  }
+  .sidebar-head{padding:22px 20px 14px;}
+  .brand{font-size:16px;font-weight:600;letter-spacing:.5px;}
+  .brand .dot{color:var(--accent);}
+  .brand-sub{font-size:12px;color:var(--hint);margin-top:2px;}
+  .btn-new{
+    margin:14px 20px 6px;
+    padding:9px 14px;
+    background:var(--accent);color:#fff;border:none;
+    border-radius:8px;font-size:13.5px;cursor:pointer;
+    font-family:inherit;font-weight:500;
+    transition:opacity .15s;
+  }
+  .btn-new:hover{opacity:.88;}
+  .hist-label{
+    padding:14px 20px 6px;font-size:11.5px;color:var(--hint);
+    letter-spacing:1px;text-transform:uppercase;
+  }
+  .hist-list{flex:1;overflow-y:auto;padding:0 12px 20px;}
+  .hist-item{
+    padding:10px 12px;border-radius:8px;cursor:pointer;
+    margin-bottom:2px;transition:background .12s;
+    border:1px solid transparent;
+  }
+  .hist-item:hover{background:#f0f0ed;}
+  .hist-item.active{background:var(--accent-soft);border-color:var(--accent-line);}
+  .hist-date{font-size:13px;font-weight:600;}
+  .hist-preview{
+    font-size:12px;color:var(--hint);margin-top:1px;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  }
+  .hist-empty{padding:16px 20px;font-size:12.5px;color:var(--hint);line-height:1.8;}
+  .sidebar-foot{
+    border-top:1px solid var(--line);
+    padding:10px 14px;display:flex;gap:8px;flex-shrink:0;
+  }
+  .btn-foot{
+    flex:1;background:#fff;border:1px solid var(--line);
+    border-radius:7px;padding:7px 4px;font-size:12px;
+    color:var(--ink-soft);cursor:pointer;font-family:inherit;
+    transition:background .12s;
+  }
+  .btn-foot:hover{background:#f0f0ed;}
+
+  .main{flex:1;min-width:0;display:flex;flex-direction:column;}
+  .main-inner{max-width:720px;width:100%;margin:0 auto;padding:34px 28px 80px;}
+
+  /* ---------- toolbar ---------- */
+  .toolbar{
+    display:flex;align-items:center;gap:12px;flex-wrap:wrap;
+    margin-bottom:26px;
+  }
+  .date-wrap{display:flex;align-items:center;gap:8px;}
+  .date-wrap label{font-size:13px;color:var(--ink-soft);}
+  input[type=date]{
+    font-family:inherit;font-size:14px;color:var(--ink);
+    border:1px solid var(--line);border-radius:7px;
+    padding:6px 9px;background:#fff;
+  }
+  .toolbar .spacer{flex:1;}
+  .save-state{font-size:12px;color:var(--hint);}
+  .save-state.dirty{color:var(--danger);}
+  .save-state.saved{color:var(--accent);}
+  .btn{
+    font-family:inherit;font-size:13px;cursor:pointer;
+    border-radius:7px;padding:7px 14px;font-weight:500;
+    transition:opacity .15s,background .15s;
+  }
+  .btn-primary{background:var(--accent);color:#fff;border:1px solid var(--accent);}
+  .btn-primary:hover{opacity:.88;}
+  .btn-ghost{background:#fff;color:var(--ink-soft);border:1px solid var(--line);}
+  .btn-ghost:hover{background:#f3f3f0;}
+  .btn-danger{background:#fff;color:var(--danger);border:1px solid #e7d3d1;}
+  .btn-danger:hover{background:#faf2f1;}
+
+  /* ---------- page intro ---------- */
+  .page-title{font-size:25px;font-weight:700;letter-spacing:.5px;}
+  .page-quote{
+    font-size:13.5px;color:var(--hint);margin-top:6px;margin-bottom:30px;
+  }
+
+  /* ---------- sections ---------- */
+  .section{
+    background:var(--card);border:1px solid var(--line);
+    border-radius:var(--radius);box-shadow:var(--shadow);
+    padding:26px 26px 10px;margin-bottom:22px;
+  }
+  .section-head{
+    display:flex;align-items:baseline;gap:10px;
+    margin-bottom:6px;
+  }
+  .section-tag{
+    font-size:11px;color:var(--accent);font-weight:600;
+    letter-spacing:1.5px;
+  }
+  .section-title{font-size:18px;font-weight:700;margin-bottom:20px;}
+
+  /* ---------- question block ---------- */
+  .q{margin-bottom:24px;}
+  .q-num{
+    display:inline-flex;align-items:center;justify-content:center;
+    width:20px;height:20px;border-radius:50%;
+    background:var(--accent-soft);color:var(--accent);
+    font-size:11.5px;font-weight:700;margin-right:7px;
+    vertical-align:1px;
+  }
+  .q-text{font-size:14.5px;font-weight:600;line-height:1.6;}
+  .q-hint{
+    font-size:12.5px;color:var(--hint);margin-top:4px;
+    margin-bottom:10px;line-height:1.65;
+  }
+  .q-body{margin-top:10px;}
+
+  /* ---------- fields ---------- */
+  .field{margin-bottom:10px;}
+  .field-label{
+    font-size:12.5px;color:var(--ink-soft);
+    display:block;margin-bottom:4px;
+  }
+  input[type=text],textarea{
+    width:100%;font-family:inherit;font-size:14px;color:var(--ink);
+    border:1px solid var(--line);border-radius:8px;
+    padding:9px 11px;background:#fcfcfb;line-height:1.6;
+    transition:border-color .12s,background .12s;
+    resize:vertical;
+  }
+  input[type=text]::placeholder,textarea::placeholder{color:#c2c2bd;}
+  input[type=text]:focus,textarea:focus{
+    outline:none;border-color:var(--accent-line);background:#fff;
+  }
+  textarea{min-height:62px;}
+
+  /* repeatable card item */
+  .item{
+    border:1px solid var(--line-soft);border-radius:10px;
+    padding:14px 14px 6px;margin-bottom:10px;
+    background:#fcfcfb;position:relative;
+  }
+  .item-head{
+    display:flex;align-items:center;justify-content:space-between;
+    margin-bottom:8px;
+  }
+  .item-title{font-size:12.5px;font-weight:600;color:var(--accent);}
+  .btn-remove{
+    background:none;border:none;cursor:pointer;
+    color:var(--hint);font-size:12px;font-family:inherit;
+    padding:2px 4px;
+  }
+  .btn-remove:hover{color:var(--danger);}
+
+  .btn-add{
+    background:none;border:1px dashed var(--accent-line);
+    color:var(--accent);font-family:inherit;font-size:13px;
+    border-radius:8px;padding:7px 0;width:100%;cursor:pointer;
+    margin-bottom:4px;transition:background .12s;
+  }
+  .btn-add:hover{background:var(--accent-soft);}
+
+  /* progress bar field */
+  .prog-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:13px;color:var(--ink-soft);}
+  .prog-num{
+    width:58px;text-align:center;font-family:inherit;font-size:14px;
+    border:1px solid var(--line);border-radius:7px;padding:6px 4px;background:#fff;
+  }
+  .prog-track{
+    flex:1;min-width:120px;height:7px;border-radius:4px;
+    background:#ececea;position:relative;overflow:hidden;margin:0 2px;
+  }
+  .prog-fill{
+    position:absolute;height:100%;border-radius:4px;
+    background:var(--accent);opacity:.55;transition:all .2s;
+  }
+
+  /* celebrate */
+  .celebrate{
+    background:var(--accent-soft);border:1px solid var(--accent-line);
+    border-radius:10px;padding:14px;
+  }
+  .celebrate textarea{background:#fff;border-color:var(--accent-line);}
+
+  /* ---------- mobile ---------- */
+  .menu-toggle{display:none;}
+  @media(max-width:780px){
+    .app{flex-direction:column;}
+    .sidebar{
+      width:100%;height:auto;position:relative;
+      border-right:none;border-bottom:1px solid var(--line);
+    }
+    .sidebar.collapsed .hist-list,
+    .sidebar.collapsed .hist-label,
+    .sidebar.collapsed .sidebar-foot,
+    .sidebar.collapsed .btn-new{display:none;}
+    .hist-list{max-height:240px;}
+    .menu-toggle{
+      display:block;position:absolute;top:20px;right:18px;
+      background:none;border:1px solid var(--line);border-radius:7px;
+      padding:5px 10px;font-size:12px;cursor:pointer;font-family:inherit;
+      color:var(--ink-soft);
+    }
+    .main-inner{padding:24px 16px 70px;}
+    .section{padding:20px 16px 6px;}
+  }
+
+  /* ---------- print ---------- */
+  @media print{
+    .sidebar,.toolbar,.btn-add,.btn-remove,.menu-toggle{display:none!important;}
+    body{background:#fff;}
+    .section{box-shadow:none;border-color:#ddd;page-break-inside:avoid;}
+    .main-inner{max-width:100%;padding:0;}
+    input[type=text],textarea{background:#fff;border-color:#ddd;}
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <!-- ===================== Sidebar ===================== -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-head">
+      <div class="brand">我的一日计划<span class="dot">.</span></div>
+      <div class="brand-sub">一点一点，把期待的事变成真的</div>
+      <button class="menu-toggle" id="menuToggle">历史</button>
+    </div>
+    <button class="btn-new" id="btnNew">＋ 新建一日计划</button>
+    <div class="hist-label">历史记录</div>
+    <div class="hist-list" id="histList"></div>
+    <div class="sidebar-foot">
+      <button class="btn-foot" id="btnExport">⇩ 导出备份</button>
+      <button class="btn-foot" id="btnImport">⇧ 导入备份</button>
+      <input type="file" id="importFile" accept=".json,application/json" hidden>
+    </div>
+  </aside>
+
+  <!-- ===================== Main ===================== -->
+  <div class="main">
+    <div class="main-inner">
+      <div class="toolbar">
+        <div class="date-wrap">
+          <label for="planDate">计划日期</label>
+          <input type="date" id="planDate">
+        </div>
+        <div class="spacer"></div>
+        <span class="save-state" id="saveState"></span>
+        <button class="btn btn-ghost" id="btnPrint">打印</button>
+        <button class="btn btn-danger" id="btnDelete" style="display:none">删除</button>
+        <button class="btn btn-primary" id="btnSave">保存</button>
+      </div>
+
+      <div class="page-title">我的一日目标与计划</div>
+      <div class="page-quote">明确的目标计划，会让期待的事情，更容易发生。</div>
+
+      <!-- ============ Section A：目标与计划 ============ -->
+      <div class="section">
+        <div class="section-head">
+          <span class="section-tag">PART 1</span>
+        </div>
+        <div class="section-title">我的一日目标与计划</div>
+
+        <!-- Q1 -->
+        <div class="q">
+          <div><span class="q-num">1</span><span class="q-text">接下来一天，我最想要努力推进的 1-3 件重要事情是什么？</span></div>
+          <div class="q-hint">如果这里面包含了主线目标之外的事情，可以同时记录「为什么这件事是重要的」。</div>
+          <div class="q-body">
+            <div id="thingsList"></div>
+            <button class="btn-add" data-add="thing">＋ 添加一件事情</button>
+          </div>
+        </div>
+
+        <!-- Q2 -->
+        <div class="q">
+          <div><span class="q-num">2</span><span class="q-text">为这 1-3 件事情，设定具体完成目标，包括「进取」和「保守」两个版本。</span></div>
+          <div class="q-hint">尝试找到可以量化目标实现程度的关键数据，例如：数量 / 百分比 / 累计时间等。</div>
+          <div class="q-body">
+            <div id="goalsList"></div>
+            <button class="btn-add" data-add="goal">＋ 添加一组目标</button>
+          </div>
+        </div>
+
+        <!-- Q3 -->
+        <div class="q">
+          <div><span class="q-num">3</span><span class="q-text">试着使用执行意图技术，做出促进目标实现的关键行动计划。</span></div>
+          <div class="q-hint">只需要包括和实现目标有关的事，按照发生时间先后顺序安排。</div>
+          <div class="q-body">
+            <div id="actionsList"></div>
+            <button class="btn-add" data-add="action">＋ 添加一个行动</button>
+          </div>
+        </div>
+
+        <!-- Q4 -->
+        <div class="q">
+          <div><span class="q-num">4</span><span class="q-text">接下来一天，我最期待哪件事发生？</span></div>
+          <div class="q-hint">尽情想象它顺利发生后的美好结果吧！</div>
+          <div class="q-body">
+            <textarea id="expectation" placeholder="写下你最期待发生的事，以及它顺利发生后的画面……"></textarea>
+          </div>
+        </div>
+
+        <!-- Q5 -->
+        <div class="q">
+          <div><span class="q-num">5</span><span class="q-text">接下来一天，我期待以怎样的态度迎接？</span></div>
+          <div class="q-hint">写下自己的关键词吧！</div>
+          <div class="q-body">
+            <input type="text" id="attitude" placeholder="例如：践行、挑战、从容、温柔……">
+          </div>
+        </div>
+      </div>
+
+      <!-- ============ Section B：成就复盘 ============ -->
+      <div class="section">
+        <div class="section-head">
+          <span class="section-tag">PART 2</span>
+        </div>
+        <div class="section-title">上一日成就复盘</div>
+
+        <!-- R1 -->
+        <div class="q">
+          <div><span class="q-num">1</span><span class="q-text">过去一天，我的哪些重要事项取得了新进展？我是如何成功做到的？</span></div>
+          <div class="q-hint">在你正在努力的事情上，设置目标进度条：0 是起点，100% 是终点，记录一天行动带来的进度变化。</div>
+          <div class="q-body">
+            <div id="progressList"></div>
+            <button class="btn-add" data-add="progress">＋ 添加一项进展</button>
+          </div>
+        </div>
+
+        <!-- R2 -->
+        <div class="q">
+          <div><span class="q-num">2</span><span class="q-text">推进过程中，我获得了哪些积极信号，意味着进展发生了？</span></div>
+          <div class="q-hint">例如：积极反馈、经验增长，或者生活发生了新变化。初期这些信号可能不明显，未来你可以持续观察这些变化。</div>
+          <div class="q-body">
+            <div id="signalsList"></div>
+            <button class="btn-add" data-add="signal">＋ 添加一个积极信号</button>
+          </div>
+        </div>
+
+        <!-- R3 -->
+        <div class="q" style="margin-bottom:14px;">
+          <div><span class="q-num">3</span><span class="q-text">此刻，给正在使用「成就视角」记录生活的自己，一点庆祝吧！</span></div>
+          <div class="q-hint">说一点鼓励的话，或者做一个庆祝动作！</div>
+          <div class="q-body">
+            <div class="celebrate">
+              <textarea id="celebration" placeholder="对自己说点什么吧……"></textarea>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  /* ============ 常量 ============ */
+  var STORE_KEY = "myDailyPlans_v1";
+  var DRAFT_KEY = "myDailyPlanDraft_v1";
+
+  /* ============ DOM ============ */
+  var $ = function(id){return document.getElementById(id);};
+  var histList   = $("histList");
+  var planDate   = $("planDate");
+  var saveState  = $("saveState");
+  var thingsList = $("thingsList");
+  var goalsList  = $("goalsList");
+  var actionsList= $("actionsList");
+  var progressList=$("progressList");
+  var signalsList= $("signalsList");
+
+  /* ============ 状态 ============ */
+  var plans = [];          // 全部历史
+  var currentId = null;    // 当前正在编辑的记录 id（null = 新建未保存）
+  var dirty = false;       // 是否有未保存的改动
+
+  /* ============ 存取 ============ */
+  function loadPlans(){
+    try{ plans = JSON.parse(localStorage.getItem(STORE_KEY)) || []; }
+    catch(e){ plans = []; }
+  }
+  function persist(){
+    try{ localStorage.setItem(STORE_KEY, JSON.stringify(plans)); }
+    catch(e){ alert("保存失败：浏览器本地存储不可用。"); }
+  }
+  function saveDraft(){
+    try{ localStorage.setItem(DRAFT_KEY, JSON.stringify({id:currentId, data:readForm()})); }
+    catch(e){}
+  }
+  function clearDraft(){
+    try{ localStorage.removeItem(DRAFT_KEY); }catch(e){}
+  }
+
+  /* ============ 工具 ============ */
+  function todayStr(){
+    var d=new Date(), p=function(n){return (n<10?"0":"")+n;};
+    return d.getFullYear()+"-"+p(d.getMonth()+1)+"-"+p(d.getDate());
+  }
+  function fmtDate(s){
+    if(!s) return "";
+    var parts=s.split("-");
+    if(parts.length!==3) return s;
+    return parseInt(parts[1],10)+"月"+parseInt(parts[2],10)+"日";
+  }
+  function escapeHtml(t){
+    return (t||"").replace(/[&<>"]/g,function(c){
+      return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c];
+    });
+  }
+  function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
+
+  function markDirty(){
+    dirty=true;
+    saveState.textContent="● 未保存";
+    saveState.className="save-state dirty";
+    saveDraft();
+  }
+  function markSaved(){
+    dirty=false;
+    saveState.textContent="✓ 已保存";
+    saveState.className="save-state saved";
+  }
+
+  /* ============ 重复项模板 ============ */
+  function thingNode(val){
+    var el=document.createElement("div");
+    el.className="item";
+    el.innerHTML=
+      '<div class="item-head"><span class="item-title">事情</span>'+
+      '<button type="button" class="btn-remove">移除</button></div>'+
+      '<input type="text" data-f="text" placeholder="一件想推进的重要事情">';
+    el.querySelector('[data-f=text]').value=val&&val.text||"";
+    return el;
+  }
+  function goalNode(val){
+    val=val||{};
+    var el=document.createElement("div");
+    el.className="item";
+    el.innerHTML=
+      '<div class="item-head"><span class="item-title">一组目标</span>'+
+      '<button type="button" class="btn-remove">移除</button></div>'+
+      '<div class="field"><label class="field-label">一日小目标 · 进取版</label>'+
+      '<textarea data-f="aggressive" placeholder="理想状态下，我希望达成……"></textarea></div>'+
+      '<div class="field"><label class="field-label">一日小目标 · 保守版</label>'+
+      '<textarea data-f="conservative" placeholder="即使状态一般，我也至少要做到……"></textarea></div>';
+    el.querySelector('[data-f=aggressive]').value=val.aggressive||"";
+    el.querySelector('[data-f=conservative]').value=val.conservative||"";
+    return el;
+  }
+  function actionNode(val){
+    val=val||{};
+    var el=document.createElement("div");
+    el.className="item";
+    el.innerHTML=
+      '<div class="item-head"><span class="item-title item-idx">行动</span>'+
+      '<button type="button" class="btn-remove">移除</button></div>'+
+      '<div class="field"><label class="field-label">行动内容</label>'+
+      '<input type="text" data-f="title" placeholder="一个促进目标实现的具体行动"></div>'+
+      '<div class="field"><label class="field-label">预计发生与持续时间</label>'+
+      '<input type="text" data-f="time" placeholder="例如：10:30-12:00"></div>'+
+      '<div class="field"><label class="field-label">预计发生地点</label>'+
+      '<input type="text" data-f="place" placeholder="例如：工位、家里"></div>'+
+      '<div class="field"><label class="field-label">预计行动过程</label>'+
+      '<textarea data-f="process" placeholder="具体会怎么做……"></textarea></div>'+
+      '<div class="field"><label class="field-label">如果（有这些意外 / 阻碍发生）</label>'+
+      '<textarea data-f="ifPart" placeholder="可能出现的阻碍……"></textarea></div>'+
+      '<div class="field"><label class="field-label">那么（我将做出这些替代行动）</label>'+
+      '<textarea data-f="thenPart" placeholder="替代的应对方式……"></textarea></div>';
+    el.querySelector('[data-f=title]').value=val.title||"";
+    el.querySelector('[data-f=time]').value=val.time||"";
+    el.querySelector('[data-f=place]').value=val.place||"";
+    el.querySelector('[data-f=process]').value=val.process||"";
+    el.querySelector('[data-f=ifPart]').value=val.ifPart||"";
+    el.querySelector('[data-f=thenPart]').value=val.thenPart||"";
+    return el;
+  }
+  function progressNode(val){
+    val=val||{};
+    var el=document.createElement("div");
+    el.className="item";
+    el.innerHTML=
+      '<div class="item-head"><span class="item-title item-idx">进展事项</span>'+
+      '<button type="button" class="btn-remove">移除</button></div>'+
+      '<div class="field"><label class="field-label">进展事项</label>'+
+      '<input type="text" data-f="item" placeholder="取得新进展的重要事项"></div>'+
+      '<div class="field"><label class="field-label">一日进度条</label>'+
+      '<div class="prog-row">从 '+
+      '<input type="number" min="0" max="100" class="prog-num" data-f="from" placeholder="0"> % '+
+      '推进到 '+
+      '<input type="number" min="0" max="100" class="prog-num" data-f="to" placeholder="0"> %'+
+      '<span class="prog-track"><span class="prog-fill"></span></span></div></div>'+
+      '<div class="field"><label class="field-label">我是如何做到的</label>'+
+      '<textarea data-f="how" placeholder="回顾推进的具体过程……"></textarea></div>';
+    el.querySelector('[data-f=item]').value=val.item||"";
+    el.querySelector('[data-f=from]').value=(val.from!==undefined&&val.from!==null)?val.from:"";
+    el.querySelector('[data-f=to]').value=(val.to!==undefined&&val.to!==null)?val.to:"";
+    el.querySelector('[data-f=how]').value=val.how||"";
+    updateProgFill(el);
+    el.querySelector('[data-f=from]').addEventListener("input",function(){updateProgFill(el);});
+    el.querySelector('[data-f=to]').addEventListener("input",function(){updateProgFill(el);});
+    return el;
+  }
+  function signalNode(val){
+    var el=document.createElement("div");
+    el.className="item";
+    el.innerHTML=
+      '<div class="item-head"><span class="item-title">积极信号</span>'+
+      '<button type="button" class="btn-remove">移除</button></div>'+
+      '<input type="text" data-f="text" placeholder="一个意味着进展发生了的积极信号">';
+    el.querySelector('[data-f=text]').value=val&&val.text||"";
+    return el;
+  }
+
+  function updateProgFill(el){
+    var from=parseFloat(el.querySelector('[data-f=from]').value)||0;
+    var to=parseFloat(el.querySelector('[data-f=to]').value)||0;
+    from=Math.max(0,Math.min(100,from));
+    to=Math.max(0,Math.min(100,to));
+    var lo=Math.min(from,to), hi=Math.max(from,to);
+    var fill=el.querySelector(".prog-fill");
+    fill.style.left=lo+"%";
+    fill.style.width=(hi-lo)+"%";
+  }
+
+  /* 给行动 / 进展项重新编号 */
+  function renumber(container,label){
+    var items=container.querySelectorAll(":scope > .item");
+    for(var i=0;i<items.length;i++){
+      var t=items[i].querySelector(".item-idx");
+      if(t) t.textContent=label+" "+(i+1);
+    }
+  }
+
+  /* 往某个列表添加一项 */
+  function addItem(type,val,silent){
+    var map={
+      thing:[thingsList,thingNode,null,null],
+      goal:[goalsList,goalNode,null,null],
+      action:[actionsList,actionNode,"行动",null],
+      progress:[progressList,progressNode,"进展事项",null],
+      signal:[signalsList,signalNode,null,null]
+    };
+    var cfg=map[type];
+    var node=cfg[1](val);
+    cfg[0].appendChild(node);
+    if(cfg[2]) renumber(cfg[0],cfg[2]);
+    if(!silent) markDirty();
+    return node;
+  }
+
+  /* ============ 读取 / 渲染表单 ============ */
+  function readList(container){
+    var out=[];
+    var items=container.querySelectorAll(":scope > .item");
+    for(var i=0;i<items.length;i++){
+      var fields=items[i].querySelectorAll("[data-f]");
+      var obj={};
+      for(var j=0;j<fields.length;j++){
+        obj[fields[j].getAttribute("data-f")]=fields[j].value;
+      }
+      out.push(obj);
+    }
+    return out;
+  }
+  function readForm(){
+    return {
+      date:planDate.value,
+      things:readList(thingsList),
+      goals:readList(goalsList),
+      actions:readList(actionsList),
+      expectation:$("expectation").value,
+      attitude:$("attitude").value,
+      progress:readList(progressList),
+      signals:readList(signalsList),
+      celebration:$("celebration").value
+    };
+  }
+  function clearLists(){
+    thingsList.innerHTML="";goalsList.innerHTML="";actionsList.innerHTML="";
+    progressList.innerHTML="";signalsList.innerHTML="";
+  }
+  function renderForm(data){
+    data=data||{};
+    planDate.value=data.date||todayStr();
+    $("expectation").value=data.expectation||"";
+    $("attitude").value=data.attitude||"";
+    $("celebration").value=data.celebration||"";
+    clearLists();
+    var lists=[
+      ["thing",data.things],["goal",data.goals],["action",data.actions],
+      ["progress",data.progress],["signal",data.signals]
+    ];
+    for(var i=0;i<lists.length;i++){
+      var type=lists[i][0], arr=lists[i][1];
+      if(arr&&arr.length){
+        for(var k=0;k<arr.length;k++) addItem(type,arr[k],true);
+      }else{
+        addItem(type,null,true); // 至少留一个空项
+      }
+    }
+  }
+
+  /* ============ 新建 / 保存 / 删除 ============ */
+  function newPlan(){
+    if(dirty && !confirm("当前有未保存的改动，确定新建吗？")) return;
+    currentId=null;
+    renderForm({date:todayStr()});
+    $("btnDelete").style.display="none";
+    saveState.textContent="";saveState.className="save-state";
+    dirty=false;clearDraft();
+    renderHistory();
+    window.scrollTo(0,0);
+  }
+
+  function savePlan(){
+    var data=readForm();
+    if(!data.date){ alert("请先选择计划日期。"); return; }
+    if(currentId){
+      for(var i=0;i<plans.length;i++){
+        if(plans[i].id===currentId){
+          plans[i].date=data.date;
+          plans[i].data=data;
+          plans[i].updatedAt=Date.now();
+          break;
+        }
+      }
+    }else{
+      currentId=uid();
+      plans.push({id:currentId,date:data.date,data:data,
+                  createdAt:Date.now(),updatedAt:Date.now()});
+    }
+    persist();
+    clearDraft();
+    markSaved();
+    $("btnDelete").style.display="";
+    renderHistory();
+  }
+
+  function deletePlan(){
+    if(!currentId) return;
+    if(!confirm("确定删除这条一日计划吗？此操作不可恢复。")) return;
+    plans=plans.filter(function(p){return p.id!==currentId;});
+    persist();clearDraft();
+    currentId=null;
+    renderForm({date:todayStr()});
+    $("btnDelete").style.display="none";
+    saveState.textContent="";saveState.className="save-state";
+    dirty=false;
+    renderHistory();
+  }
+
+  function openPlan(id){
+    if(dirty && !confirm("当前有未保存的改动，确定切换吗？")) return;
+    var p=null;
+    for(var i=0;i<plans.length;i++){ if(plans[i].id===id){p=plans[i];break;} }
+    if(!p) return;
+    currentId=id;
+    renderForm(p.data);
+    $("btnDelete").style.display="";
+    markSaved();
+    dirty=false;clearDraft();
+    renderHistory();
+    window.scrollTo(0,0);
+  }
+
+  /* ============ 导出 / 导入备份 ============ */
+  function exportBackup(){
+    if(!plans.length){ alert("还没有可导出的记录，先填写并保存一条吧。"); return; }
+    var payload={app:"myDailyPlan",version:1,exportedAt:Date.now(),plans:plans};
+    var blob=new Blob([JSON.stringify(payload,null,2)],{type:"application/json"});
+    var url=URL.createObjectURL(blob);
+    var a=document.createElement("a");
+    a.href=url;
+    a.download="一日计划备份_"+todayStr()+".json";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  function importBackup(file){
+    var reader=new FileReader();
+    reader.onload=function(){
+      var parsed;
+      try{ parsed=JSON.parse(reader.result); }
+      catch(e){ alert("导入失败：这不是一个有效的备份文件。"); return; }
+      var incoming=Array.isArray(parsed)?parsed:(parsed&&parsed.plans);
+      if(!Array.isArray(incoming)){
+        alert("导入失败：没有在文件里找到一日计划记录。"); return;
+      }
+      var byId={},i;
+      for(i=0;i<plans.length;i++) byId[plans[i].id]=plans[i];
+      var added=0,updated=0,skipped=0;
+      for(i=0;i<incoming.length;i++){
+        var ip=incoming[i];
+        if(!ip||!ip.data) continue;
+        if(!ip.id) ip.id=uid();
+        if(byId[ip.id]){
+          var ex=byId[ip.id];
+          if((ip.updatedAt||0)>(ex.updatedAt||0)){
+            ex.date=ip.date;ex.data=ip.data;
+            ex.updatedAt=ip.updatedAt||Date.now();
+            updated++;
+          }else skipped++;
+        }else{
+          plans.push(ip);byId[ip.id]=ip;added++;
+        }
+      }
+      persist();
+      renderHistory();
+      // 若当前打开的记录被导入更新了，且没有未保存改动，则刷新表单
+      if(currentId && !dirty){
+        for(i=0;i<plans.length;i++){
+          if(plans[i].id===currentId){ renderForm(plans[i].data);break; }
+        }
+      }
+      alert("导入完成：新增 "+added+" 条，更新 "+updated+" 条，跳过 "+skipped+" 条（跳过的是本地已是最新的记录）。");
+    };
+    reader.onerror=function(){ alert("导入失败：无法读取该文件。"); };
+    reader.readAsText(file);
+  }
+
+  /* ============ 历史列表 ============ */
+  function planPreview(p){
+    var d=p.data||{};
+    if(d.things&&d.things.length){
+      var t=d.things.map(function(x){return x.text;}).filter(Boolean);
+      if(t.length) return t.join("、");
+    }
+    if(d.goals&&d.goals.length){
+      for(var i=0;i<d.goals.length;i++){
+        if(d.goals[i].aggressive) return d.goals[i].aggressive;
+        if(d.goals[i].conservative) return d.goals[i].conservative;
+      }
+    }
+    if(d.attitude) return "态度："+d.attitude;
+    return "（空白计划）";
+  }
+  function renderHistory(){
+    var sorted=plans.slice().sort(function(a,b){
+      if(a.date!==b.date) return a.date<b.date?1:-1;
+      return (b.updatedAt||0)-(a.updatedAt||0);
+    });
+    if(!sorted.length){
+      histList.innerHTML='<div class="hist-empty">还没有记录。<br>填写后点「保存」，这里会出现你的一日计划。</div>';
+      return;
+    }
+    histList.innerHTML="";
+    for(var i=0;i<sorted.length;i++){
+      var p=sorted[i];
+      var el=document.createElement("div");
+      el.className="hist-item"+(p.id===currentId?" active":"");
+      el.setAttribute("data-id",p.id);
+      el.innerHTML='<div class="hist-date">'+fmtDate(p.date)+'</div>'+
+                   '<div class="hist-preview">'+escapeHtml(planPreview(p))+'</div>';
+      histList.appendChild(el);
+    }
+  }
+
+  /* ============ 事件绑定 ============ */
+  // 添加按钮
+  document.addEventListener("click",function(e){
+    var add=e.target.closest&&e.target.closest("[data-add]");
+    if(add){ addItem(add.getAttribute("data-add")); return; }
+
+    var rm=e.target.closest&&e.target.closest(".btn-remove");
+    if(rm){
+      var item=rm.closest(".item");
+      var container=item.parentNode;
+      item.remove();
+      if(container===actionsList) renumber(actionsList,"行动");
+      if(container===progressList) renumber(progressList,"进展事项");
+      markDirty();
+      return;
+    }
+
+    var hist=e.target.closest&&e.target.closest(".hist-item");
+    if(hist){ openPlan(hist.getAttribute("data-id")); return; }
+  });
+
+  // 任何输入 → 标记未保存
+  document.addEventListener("input",function(e){
+    if(e.target.closest(".main")) markDirty();
+  });
+
+  $("btnNew").addEventListener("click",newPlan);
+  $("btnSave").addEventListener("click",savePlan);
+  $("btnDelete").addEventListener("click",deletePlan);
+  $("btnPrint").addEventListener("click",function(){window.print();});
+  $("btnExport").addEventListener("click",exportBackup);
+  $("btnImport").addEventListener("click",function(){ $("importFile").click(); });
+  $("importFile").addEventListener("change",function(e){
+    var f=e.target.files&&e.target.files[0];
+    if(f) importBackup(f);
+    e.target.value="";
+  });
+  $("menuToggle").addEventListener("click",function(){
+    $("sidebar").classList.toggle("collapsed");
+  });
+
+  // 键盘快捷键：Cmd/Ctrl + S 保存
+  document.addEventListener("keydown",function(e){
+    if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==="s"){
+      e.preventDefault();savePlan();
+    }
+  });
+
+  // 离开页面提醒
+  window.addEventListener("beforeunload",function(e){
+    if(dirty){ e.preventDefault();e.returnValue=""; }
+  });
+
+  /* ============ 初始化 ============ */
+  function init(){
+    loadPlans();
+    if(window.innerWidth<=780) $("sidebar").classList.add("collapsed");
+
+    var draft=null;
+    try{ draft=JSON.parse(localStorage.getItem(DRAFT_KEY)); }catch(e){}
+
+    if(draft && draft.data){
+      currentId=draft.id||null;
+      renderForm(draft.data);
+      $("btnDelete").style.display=currentId?"":"none";
+      dirty=true;
+      saveState.textContent="● 未保存（已恢复草稿）";
+      saveState.className="save-state dirty";
+    }else{
+      renderForm({date:todayStr()});
+    }
+    renderHistory();
+  }
+
+  init();
+})();
+</script>
+</body>
+</html>
